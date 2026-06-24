@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.ruff_cache/
+.venv/
+build/
+dist/
+*.egg-info/
+interview-transcripts/
+*.wav
+*.mov
+*.mp4

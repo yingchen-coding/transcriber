@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interview-transcriber"
+dynamic = ["version"]
+description = "Local interview recording, MLX Whisper transcription, and analysis artifacts"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "mlx-whisper>=0.4.3",
+  "numpy>=1.26",
+  "sounddevice>=0.5",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.11"]
+
+[project.urls]
+Repository = "https://github.com/yingchen-coding/transcript"
+
+[project.scripts]
+interview-transcriber = "interview_transcriber:main"
+
+[tool.setuptools]
+py-modules = ["interview_transcriber"]
+
+[tool.setuptools.dynamic]
+version = {file = ["VERSION"]}
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "FA", "I", "RUF", "SIM", "UP"]
