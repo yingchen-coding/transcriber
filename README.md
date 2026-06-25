@@ -1,5 +1,9 @@
 # Transcriber
 
+[![CI](https://github.com/yingchen-coding/transcript/actions/workflows/ci.yml/badge.svg)](https://github.com/yingchen-coding/transcript/actions)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Fast local transcription for anything you need to remember.
 
 Transcriber records an explicitly started room-microphone session, shows a live transcript, saves
@@ -9,6 +13,12 @@ review workflows.
 
 Raw audio stays on your machine by default. Recording never starts automatically. Get consent from
 everyone being recorded.
+
+## Star This If
+
+- You want a local meeting/interview/lecture recorder that keeps raw audio and transcripts on disk.
+- You need both low-latency live notes and a cleaner final transcript after the session.
+- You want analysis prompts grounded in transcript evidence without sending data anywhere by default.
 
 ## What It Does
 

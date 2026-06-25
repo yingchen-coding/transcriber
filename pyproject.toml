@@ -8,6 +8,19 @@ dynamic = ["version"]
 description = "Local room recording, MLX Whisper transcription, and analysis artifacts"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Ying Chen" }]
+keywords = ["transcription", "mlx-whisper", "local-first", "meetings", "voice-notes", "macos"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
 dependencies = [
   "mlx-whisper>=0.4.3",
   "numpy>=1.26",
@@ -18,7 +31,9 @@ dependencies = [
 dev = ["ruff>=0.11"]
 
 [project.urls]
+Homepage = "https://github.com/yingchen-coding/transcript"
 Repository = "https://github.com/yingchen-coding/transcript"
+Issues = "https://github.com/yingchen-coding/transcript/issues"
 
 [project.scripts]
 transcriber = "transcriber:main"
