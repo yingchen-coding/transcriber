@@ -1,17 +1,23 @@
-# Interview Transcriber v1
+# Transcriber
 
-Local, session-based interview recording and transcription for Apple Silicon Macs.
+Fast local transcription for anything you need to remember.
 
-## What v1 Does
+Transcriber records an explicitly started room-microphone session, shows a live transcript, saves
+the raw audio locally, and produces a higher-context final transcript after recording stops. It is
+designed for meetings, lectures, voice notes, debugging sessions, calls on speaker, and personal
+review workflows.
 
-- Records an explicitly started room-microphone session to durable 16 kHz WAV.
+Raw audio stays on your machine by default. Recording never starts automatically. Get consent from
+everyone being recorded.
+
+## What It Does
+
+- Records a session to a durable 16 kHz WAV file.
 - Opens a visible Terminal monitor with a recording heartbeat and live transcript.
-- Uses full MLX Whisper large-v3 with 15-second live chunks.
-- Re-transcribes 30-second windows after stop for a higher-context final transcript.
+- Uses MLX Whisper large-v3 on Apple Silicon Macs.
+- Re-transcribes 30-second windows after stop for a cleaner final transcript.
 - Preserves live and final TXT/JSONL artifacts plus per-chunk latency metrics.
-- Generates an evidence-constrained interview analysis prompt and can invoke a configured Claude CLI.
-
-Recording never starts automatically. Obtain consent from everyone being recorded.
+- Generates an evidence-constrained analysis prompt without sending data anywhere by default.
 
 ## Install
 
@@ -20,38 +26,38 @@ python3 --version  # must be 3.10+
 python3 -m pip install -e '.[dev]'
 ```
 
-The first run downloads the MLX Whisper large-v3 model. v1 is intended for Apple Silicon macOS.
-The macOS Command Line Tools Python may be 3.9 and is not supported; use Homebrew, Conda, or another
-Python 3.10+ environment.
+The first run downloads the MLX Whisper large-v3 model. Transcriber is intended for Apple Silicon
+macOS. The macOS Command Line Tools Python may be 3.9 and is not supported; use Homebrew, Conda, or
+another Python 3.10+ environment.
 
 ## Use
 
-Chinese-dominant speech with embedded English terminology:
+Chinese-dominant speech with embedded English terms:
 
 ```bash
-interview-transcriber start --name mixed-test --language zh
+transcriber start --name team-sync --language zh
 ```
 
-English-dominant interview:
+English-dominant speech:
 
 ```bash
-interview-transcriber start --name google-interview --language en
+transcriber start --name lecture-notes --language en
 ```
 
 Control and analyze:
 
 ```bash
-interview-transcriber status
-interview-transcriber stop
-interview-transcriber refine ~/Documents/interview-transcripts/SESSION
-interview-transcriber analyze ~/Documents/interview-transcripts/SESSION
+transcriber status
+transcriber stop
+transcriber refine ~/Documents/transcripts/SESSION
+transcriber analyze ~/Documents/transcripts/SESSION
 ```
 
 `analyze` defaults to generating a local `analysis-prompt.txt` without invoking a model. Running
 `analyze SESSION --engine claude` explicitly sends the prompt and transcript through the configured
 Claude CLI; use it only when that data-handling path is acceptable.
 
-Sessions are stored under `~/Documents/interview-transcripts/`.
+Sessions are stored under `~/Documents/transcripts/`.
 
 ## Artifacts
 
@@ -61,21 +67,29 @@ Sessions are stored under `~/Documents/interview-transcripts/`.
 - `transcription-metrics.jsonl`: inference latency and filtering outcomes
 - `metadata.json`: models, duration, language mode, and dropped-block count
 - `analysis-prompt.txt`: timestamp-grounded analysis input
-- `interview-analysis.md`: optional generated analysis
+- `analysis.md`: optional generated analysis
 
-## v1 Boundaries
+## Boundaries
 
 - Select the primary language explicitly. Use `zh` for Chinese with embedded English terms and `en`
-  for English interviews. Short-chunk automatic language detection is not reliable enough.
+  for English-dominant sessions. Short-chunk automatic language detection is not reliable enough.
 - The current backend captures a microphone, not macOS system audio. Use speakers rather than
-  headphones so the remote interviewer is audible.
+  headphones so remote participants are audible.
 - Mac mini has no built-in microphone. Accuracy depends heavily on the connected input device,
   distance, room echo, and overlapping speakers.
-- The live transcript prioritizes visibility; use the final transcript for analysis.
+- The live transcript prioritizes visibility; use the final transcript for review.
+
+## Local Review
+
+```bash
+scripts/pr_review_check.sh
+```
+
+This runs Ruff, unit tests, compile checks, package install, CLI smoke, and a public-surface scan.
 
 ## Test
 
 ```bash
 python3 -m unittest discover -s tests -v
-ruff check interview_transcriber.py tests
+python3 -m ruff check transcriber.py tests
 ```

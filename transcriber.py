@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Fast, durable interview recording and transcription for macOS.
+"""Fast, durable room recording and transcription for macOS.
 
 Commands:
-    interview_transcriber.py start --name google-interview
-    interview_transcriber.py status
-    interview_transcriber.py stop
-    interview_transcriber.py analyze SESSION_DIR [--engine claude]
+    transcriber start --name lecture-notes
+    transcriber status
+    transcriber stop
+    transcriber analyze SESSION_DIR [--engine claude]
 
 The recorder is intentionally session-based. It never starts at login and always
 prints where audio is being stored. Raw audio is written before transcription so
-model failures cannot destroy the interview record.
+model failures cannot destroy the source recording.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ import sounddevice as sd
 
 def _version() -> str:
     try:
-        return version("interview-transcriber")
+        return version("local-transcriber")
     except PackageNotFoundError:
         return Path(__file__).with_name("VERSION").read_text(encoding="utf-8").strip()
 
@@ -52,7 +52,7 @@ __version__ = _version()
 SAMPLE_RATE = 16_000
 LIVE_MODEL = "mlx-community/whisper-large-v3-mlx"
 FINAL_MODEL = "mlx-community/whisper-large-v3-mlx"
-DEFAULT_ROOT = Path.home() / "Documents" / "interview-transcripts"
+DEFAULT_ROOT = Path.home() / "Documents" / "transcripts"
 ACTIVE_FILE = DEFAULT_ROOT / ".active-session.json"
 DEFAULT_CHUNK_SECONDS = 15.0
 DEFAULT_OVERLAP_SECONDS = 2.0
@@ -101,12 +101,12 @@ def _is_expected_recorder(pid: int, session_dir: str) -> bool:
     if completed.returncode != 0:
         return False
     command = completed.stdout
-    return "interview_transcriber" in command and "_record" in command and session_dir in command
+    return "transcriber" in command and "_record" in command and session_dir in command
 
 
 def _slug(value: str) -> str:
     value = re.sub(r"[^A-Za-z0-9._-]+", "-", value.strip()).strip("-._")
-    return value[:60] or "interview"
+    return value[:60] or "session"
 
 
 def _clock(seconds: float) -> str:
@@ -321,28 +321,27 @@ class TranscriptionWorker(threading.Thread):
 
 
 def _analysis_prompt(transcript: str, metadata: dict[str, Any]) -> str:
-    return f"""You are a rigorous senior interview coach analyzing the candidate's interview.
+    return f"""You are a rigorous transcript analyst reviewing a recorded session.
 
 Session metadata:
 {json.dumps(metadata, ensure_ascii=False, indent=2)}
 
 Important limits:
 - The recording is mono and has no reliable speaker diarization. Infer speakers only when clear.
-- Do not invent missing questions, intent, feedback, or facts.
+- Do not invent missing questions, intent, decisions, feedback, or facts.
 - Every important finding must cite one or more transcript timestamps.
 - Distinguish observed problems from uncertain inferences.
-- Focus on what changed the hiring signal, not cosmetic speaking style.
+- Focus on useful, evidence-grounded takeaways instead of cosmetic speaking style.
 
 Produce the report in Simplified Chinese with these sections:
-1. Executive verdict: likely level signal and the three highest-impact issues.
-2. Interview map: question/topic, Lu's approach, interviewer reaction, outcome.
-3. What Lu did well, with timestamp evidence.
-4. Problems ordered by hiring impact: technical correctness, problem framing,
-   communication, seniority/leadership signal, response to hints, and time management.
-5. For each major problem: quote or paraphrase the weak response, explain why it hurt,
-   and provide a stronger answer Lu could have given.
-6. Missed interviewer signals and where Lu should have changed course.
-7. A focused practice plan: at most five drills, each tied to evidence.
+1. Executive summary: the three highest-impact takeaways.
+2. Session map: topic, speaker flow, decisions, open questions, and outcomes.
+3. Useful details worth preserving, with timestamp evidence.
+4. Problems or weak moments ordered by practical impact.
+5. For each major issue: quote or paraphrase the relevant moment, explain why it matters,
+   and provide a stronger alternative if applicable.
+6. Missed signals or moments where the conversation should have changed course.
+7. A focused follow-up plan: at most five actions, each tied to evidence.
 8. Uncertainties caused by audio quality or missing context.
 
 Transcript:
@@ -455,7 +454,7 @@ def _refine_transcript(session_dir: Path, language: str | None) -> None:
 
 def _run_analysis(session_dir: Path, engine: str) -> Path:
     prompt_path = _write_analysis_packet(session_dir)
-    output_path = session_dir / "interview-analysis.md"
+    output_path = session_dir / "analysis.md"
     if engine == "none":
         return prompt_path
     executable = shutil.which(engine)
@@ -694,7 +693,7 @@ def _start(args: argparse.Namespace) -> int:
 def _stop() -> int:
     active = _read_json(ACTIVE_FILE)
     if not active:
-        print("No active interview recording.")
+        print("No active recording.")
         return 0
     pid = int(active.get("pid", -1))
     session_dir = str(active.get("session_dir", ""))
@@ -719,7 +718,7 @@ def _stop() -> int:
 def _status() -> int:
     active = _read_json(ACTIVE_FILE)
     if not active:
-        print("No active interview recording.")
+        print("No active recording.")
         return 0
     pid = int(active.get("pid", -1))
     state = active.get("status", "running") if _process_alive(pid) else "stale"
@@ -735,7 +734,7 @@ def _monitor(session_dir: Path) -> int:
     position = 0
     started = time.monotonic()
     last_heartbeat = 0.0
-    print("LIVE INTERVIEW TRANSCRIPT")
+    print("LIVE TRANSCRIPT")
     print(f"Session: {session_dir}")
     print("Recording is active. New text appears after each configured chunk.\n", flush=True)
     while True:
@@ -787,7 +786,7 @@ def _show_live_window(session_dir: Path) -> None:
                 "-e",
                 (
                     'display notification "Live transcript window opened" '
-                    'with title "Interview recording active"'
+                    'with title "Transcriber recording active"'
                 ),
             ],
             check=True,
@@ -804,13 +803,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    start = subparsers.add_parser("start", help="Start a background interview recording")
-    start.add_argument("--name", default="interview")
+    start = subparsers.add_parser("start", help="Start a background recording")
+    start.add_argument("--name", default="session")
     start.add_argument(
         "--language",
         choices=("en", "zh"),
         default="zh",
-        help="Primary spoken language. zh preserves embedded English terms; use en for interviews.",
+        help="Primary spoken language. zh preserves embedded English terms; use en for English.",
     )
     start.add_argument("--device", type=int, default=None)
     start.add_argument("--chunk-seconds", type=float, default=DEFAULT_CHUNK_SECONDS)
@@ -827,7 +826,7 @@ def _parser() -> argparse.ArgumentParser:
     subparsers.add_parser("stop", help="Stop the active recording and finish transcription")
     subparsers.add_parser("status", help="Show the active recording")
 
-    analyze = subparsers.add_parser("analyze", help="Prepare or run interview analysis")
+    analyze = subparsers.add_parser("analyze", help="Prepare or run transcript analysis")
     analyze.add_argument("session_dir", type=Path)
     analyze.add_argument("--engine", choices=("none", "claude"), default="none")
 

@@ -9,15 +9,15 @@ from unittest import mock
 
 import numpy as np
 
-MODULE_PATH = Path(__file__).parents[1] / "interview_transcriber.py"
-SPEC = importlib.util.spec_from_file_location("interview_transcriber", MODULE_PATH)
+MODULE_PATH = Path(__file__).parents[1] / "transcriber.py"
+SPEC = importlib.util.spec_from_file_location("transcriber", MODULE_PATH)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-class InterviewTranscriberTest(unittest.TestCase):
+class TranscriberTest(unittest.TestCase):
     def test_slug_is_safe(self):
         self.assertEqual(MODULE._slug(" Google L6 / round 2 "), "Google-L6-round-2")
 
@@ -37,7 +37,7 @@ class InterviewTranscriberTest(unittest.TestCase):
         self.assertIn("timestamp", prompt)
         self.assertIn("Do not invent", prompt)
         self.assertIn("Simplified Chinese", prompt)
-        self.assertIn("candidate's interview", prompt)
+        self.assertIn("recorded session", prompt)
 
     def test_repetition_hallucination_is_removed(self):
         self.assertEqual(MODULE._clean_transcript("回" * 80), "")
@@ -142,12 +142,12 @@ class InterviewTranscriberTest(unittest.TestCase):
         self.assertEqual(MODULE.__version__, expected)
 
     def test_analysis_is_local_by_default(self):
-        with mock.patch.object(sys, "argv", ["interview-transcriber", "analyze", "/tmp/session"]):
+        with mock.patch.object(sys, "argv", ["transcriber", "analyze", "/tmp/session"]):
             args = MODULE._parser().parse_args()
         self.assertEqual(args.engine, "none")
 
     def test_recorder_pid_requires_matching_command(self):
-        completed = mock.Mock(returncode=0, stdout="python interview_transcriber.py _record /tmp/a")
+        completed = mock.Mock(returncode=0, stdout="python transcriber.py _record /tmp/a")
         with (
             mock.patch.object(MODULE, "_process_alive", return_value=True),
             mock.patch.object(MODULE.subprocess, "run", return_value=completed),

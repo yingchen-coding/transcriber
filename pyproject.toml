@@ -3,9 +3,9 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "interview-transcriber"
+name = "local-transcriber"
 dynamic = ["version"]
-description = "Local interview recording, MLX Whisper transcription, and analysis artifacts"
+description = "Local room recording, MLX Whisper transcription, and analysis artifacts"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -21,10 +21,10 @@ dev = ["ruff>=0.11"]
 Repository = "https://github.com/yingchen-coding/transcript"
 
 [project.scripts]
-interview-transcriber = "interview_transcriber:main"
+transcriber = "transcriber:main"
 
 [tool.setuptools]
-py-modules = ["interview_transcriber"]
+py-modules = ["transcriber"]
 
 [tool.setuptools.dynamic]
 version = {file = ["VERSION"]}
