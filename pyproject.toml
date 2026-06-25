@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.11"]
+dev = ["build>=1", "ruff>=0.11", "twine>=6"]
 
 [project.urls]
 Homepage = "https://github.com/yingchen-coding/transcript"
