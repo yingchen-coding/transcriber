@@ -159,11 +159,24 @@ class TranscriberTest(unittest.TestCase):
     def test_status_marks_live_wrong_pid_as_stale(self):
         with tempfile.TemporaryDirectory() as directory:
             active_file = Path(directory) / ".active-session.json"
+            session_dir = Path(directory) / "session"
+            session_dir.mkdir()
+            MODULE._atomic_json(
+                session_dir / "metadata.json",
+                {
+                    "status": "recording",
+                    "duration_seconds": 12.5,
+                    "dropped_audio_blocks": 2,
+                },
+            )
+            (session_dir / "audio.wav").write_bytes(b"abc")
+            (session_dir / "transcript.txt").write_text("[00:00:00] hi\n", encoding="utf-8")
+            (session_dir / "transcription-metrics.jsonl").write_text("{}\n{}\n", encoding="utf-8")
             MODULE._atomic_json(
                 active_file,
                 {
                     "pid": 123,
-                    "session_dir": "/tmp/session",
+                    "session_dir": str(session_dir),
                     "status": "recording",
                 },
             )
@@ -176,7 +189,12 @@ class TranscriberTest(unittest.TestCase):
                 mock.patch("sys.stdout", output),
             ):
                 self.assertEqual(MODULE._status(), 0)
-            self.assertIn("Status: stale", output.getvalue())
+            text = output.getvalue()
+            self.assertIn("Status: stale", text)
+            self.assertIn("Metadata status: recording", text)
+            self.assertIn("Audio bytes: 3", text)
+            self.assertIn("Final transcript lines: 1", text)
+            self.assertIn("Metric records: 2", text)
 
 
 if __name__ == "__main__":

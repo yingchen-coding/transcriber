@@ -726,7 +726,34 @@ def _status() -> int:
     print(f"Status: {state}")
     print(f"Session: {session_dir}")
     print(f"PID: {pid}")
+    for line in _session_status_lines(Path(session_dir)):
+        print(line)
     return 0
+
+
+def _session_status_lines(session_dir: Path) -> list[str]:
+    metadata = _read_json(session_dir / "metadata.json") or {}
+    audio_path = session_dir / "audio.wav"
+    transcript_path = session_dir / "transcript.txt"
+    live_transcript_path = session_dir / "transcript-live.txt"
+    metrics_path = session_dir / "transcription-metrics.jsonl"
+    lines = [
+        f"Metadata status: {metadata.get('status', 'unknown')}",
+        f"Duration seconds: {metadata.get('duration_seconds', 'recording')}",
+        f"Audio bytes: {audio_path.stat().st_size if audio_path.exists() else 0}",
+        f"Final transcript lines: {_line_count(transcript_path)}",
+        f"Live transcript lines: {_line_count(live_transcript_path)}",
+        f"Metric records: {_line_count(metrics_path)}",
+        f"Dropped audio blocks: {metadata.get('dropped_audio_blocks', 0)}",
+    ]
+    return lines
+
+
+def _line_count(path: Path) -> int:
+    if not path.exists():
+        return 0
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return sum(1 for line in lines if line)
 
 
 def _monitor(session_dir: Path) -> int:
