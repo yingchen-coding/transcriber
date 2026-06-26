@@ -4,21 +4,21 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Fast local transcription for anything you need to remember.
+Record the room. Keep the raw audio. Get live notes now and a cleaner transcript after.
 
-Transcriber records an explicitly started room-microphone session, shows a live transcript, saves
-the raw audio locally, and produces a higher-context final transcript after recording stops. It is
-designed for meetings, lectures, voice notes, debugging sessions, calls on speaker, and personal
-review workflows.
+Transcriber is a local-first macOS recorder for meetings, interviews, lectures, calls on speaker,
+debugging sessions, and voice notes. It starts only when you ask, writes durable 16 kHz WAV audio
+first, streams a live transcript while recording, then re-transcribes longer windows after stop for
+a cleaner final artifact.
 
 Raw audio stays on your machine by default. Recording never starts automatically. Get consent from
 everyone being recorded.
 
 ## Star This If
 
-- You want a local meeting/interview/lecture recorder that keeps raw audio and transcripts on disk.
-- You need both low-latency live notes and a cleaner final transcript after the session.
-- You want analysis prompts grounded in transcript evidence without sending data anywhere by default.
+- You want a private room recorder for interviews, meetings, lectures, or voice notes.
+- You need live notes immediately and a cleaner final transcript for review.
+- You want evidence-grounded analysis prompts without sending data anywhere by default.
 
 ## What It Does
 
