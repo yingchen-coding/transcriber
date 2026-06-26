@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import json
 import sys
 import tempfile
@@ -154,6 +155,28 @@ class TranscriberTest(unittest.TestCase):
         ):
             self.assertTrue(MODULE._is_expected_recorder(123, "/tmp/a"))
             self.assertFalse(MODULE._is_expected_recorder(123, "/tmp/other"))
+
+    def test_status_marks_live_wrong_pid_as_stale(self):
+        with tempfile.TemporaryDirectory() as directory:
+            active_file = Path(directory) / ".active-session.json"
+            MODULE._atomic_json(
+                active_file,
+                {
+                    "pid": 123,
+                    "session_dir": "/tmp/session",
+                    "status": "recording",
+                },
+            )
+            completed = mock.Mock(returncode=0, stdout="python other.py")
+            output = io.StringIO()
+            with (
+                mock.patch.object(MODULE, "ACTIVE_FILE", active_file),
+                mock.patch.object(MODULE, "_process_alive", return_value=True),
+                mock.patch.object(MODULE.subprocess, "run", return_value=completed),
+                mock.patch("sys.stdout", output),
+            ):
+                self.assertEqual(MODULE._status(), 0)
+            self.assertIn("Status: stale", output.getvalue())
 
 
 if __name__ == "__main__":

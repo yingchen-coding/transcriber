@@ -721,9 +721,10 @@ def _status() -> int:
         print("No active recording.")
         return 0
     pid = int(active.get("pid", -1))
-    state = active.get("status", "running") if _process_alive(pid) else "stale"
+    session_dir = str(active.get("session_dir", ""))
+    state = active.get("status", "running") if _is_expected_recorder(pid, session_dir) else "stale"
     print(f"Status: {state}")
-    print(f"Session: {active.get('session_dir')}")
+    print(f"Session: {session_dir}")
     print(f"PID: {pid}")
     return 0
 
