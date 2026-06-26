@@ -1,6 +1,6 @@
 # Transcriber
 
-[![CI](https://github.com/yingchen-coding/transcript/actions/workflows/ci.yml/badge.svg)](https://github.com/yingchen-coding/transcript/actions)
+[![CI](https://github.com/yingchen-coding/transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/yingchen-coding/transcriber/actions)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 

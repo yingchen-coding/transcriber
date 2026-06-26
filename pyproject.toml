@@ -31,9 +31,9 @@ dependencies = [
 dev = ["build>=1", "ruff>=0.11", "twine>=6"]
 
 [project.urls]
-Homepage = "https://github.com/yingchen-coding/transcript"
-Repository = "https://github.com/yingchen-coding/transcript"
-Issues = "https://github.com/yingchen-coding/transcript/issues"
+Homepage = "https://github.com/yingchen-coding/transcriber"
+Repository = "https://github.com/yingchen-coding/transcriber"
+Issues = "https://github.com/yingchen-coding/transcriber/issues"
 
 [project.scripts]
 transcriber = "transcriber:main"
