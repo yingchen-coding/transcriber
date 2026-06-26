@@ -147,6 +147,25 @@ class TranscriberTest(unittest.TestCase):
             args = MODULE._parser().parse_args()
         self.assertEqual(args.engine, "none")
 
+    def test_doctor_checks_report_microphone(self):
+        devices = [{"name": "USB mic", "max_input_channels": 1}]
+        with (
+            mock.patch.object(MODULE.sys, "platform", "darwin"),
+            mock.patch.object(MODULE.sd, "query_devices", return_value=devices),
+        ):
+            checks = MODULE._doctor_checks()
+        by_name = {check["name"]: check for check in checks}
+        self.assertTrue(by_name["python>=3.10"]["ok"])
+        self.assertTrue(by_name["macos"]["ok"])
+        self.assertTrue(by_name["microphone"]["ok"])
+
+    def test_doctor_fails_without_input_device(self):
+        devices = [{"name": "speaker", "max_input_channels": 0}]
+        with mock.patch.object(MODULE.sd, "query_devices", return_value=devices):
+            checks = MODULE._doctor_checks()
+        by_name = {check["name"]: check for check in checks}
+        self.assertFalse(by_name["microphone"]["ok"])
+
     def test_recorder_pid_requires_matching_command(self):
         completed = mock.Mock(returncode=0, stdout="python transcriber.py _record /tmp/a")
         with (

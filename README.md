@@ -57,11 +57,15 @@ transcriber start --name lecture-notes --language en
 Control and analyze:
 
 ```bash
+transcriber doctor
 transcriber status
 transcriber stop
 transcriber refine ~/Documents/transcripts/SESSION
 transcriber analyze ~/Documents/transcripts/SESSION
 ```
+
+Run `transcriber doctor` before an important session. It checks Python version, macOS, MLX Whisper
+availability, and whether an input device is visible.
 
 `analyze` defaults to generating a local `analysis-prompt.txt` without invoking a model. Running
 `analyze SESSION --engine claude` explicitly sends the prompt and transcript through the configured

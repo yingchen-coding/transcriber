@@ -756,6 +756,59 @@ def _line_count(path: Path) -> int:
     return sum(1 for line in lines if line)
 
 
+def _doctor() -> int:
+    checks = _doctor_checks()
+    for check in checks:
+        mark = "ok" if check["ok"] else "FAIL"
+        detail = f" - {check['detail']}" if check.get("detail") else ""
+        print(f"{mark:<4} {check['name']}{detail}")
+    return 0 if all(check["ok"] for check in checks) else 1
+
+
+def _doctor_checks() -> list[dict[str, object]]:
+    checks: list[dict[str, object]] = [
+        {
+            "name": "python>=3.10",
+            "ok": sys.version_info >= (3, 10),
+            "detail": ".".join(str(part) for part in sys.version_info[:3]),
+        },
+        {
+            "name": "macos",
+            "ok": sys.platform == "darwin",
+            "detail": sys.platform,
+        },
+        {
+            "name": "mlx-whisper",
+            "ok": hasattr(mlx_whisper, "transcribe"),
+            "detail": LIVE_MODEL,
+        },
+    ]
+    try:
+        devices = sd.query_devices()
+    except Exception as error:
+        checks.append(
+            {
+                "name": "microphone",
+                "ok": False,
+                "detail": f"could not query audio devices: {type(error).__name__}: {error}",
+            }
+        )
+        return checks
+    input_devices = [
+        device
+        for device in devices
+        if isinstance(device, dict) and int(device.get("max_input_channels", 0) or 0) > 0
+    ]
+    checks.append(
+        {
+            "name": "microphone",
+            "ok": bool(input_devices),
+            "detail": f"{len(input_devices)} input device(s)",
+        }
+    )
+    return checks
+
+
 def _monitor(session_dir: Path) -> int:
     transcript_path = session_dir / "transcript.txt"
     metadata_path = session_dir / "metadata.json"
@@ -853,6 +906,7 @@ def _parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("stop", help="Stop the active recording and finish transcription")
     subparsers.add_parser("status", help="Show the active recording")
+    subparsers.add_parser("doctor", help="Check local recording/transcription prerequisites")
 
     analyze = subparsers.add_parser("analyze", help="Prepare or run transcript analysis")
     analyze.add_argument("session_dir", type=Path)
@@ -882,6 +936,8 @@ def main() -> int:
         return _stop()
     if args.command == "status":
         return _status()
+    if args.command == "doctor":
+        return _doctor()
     if args.command == "_monitor":
         return _monitor(args.session_dir.resolve())
     if args.command == "analyze":
