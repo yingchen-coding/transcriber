@@ -294,6 +294,63 @@ class TranscriberTest(unittest.TestCase):
             self.assertEqual(packet["target_language"], "es")
             self.assertIn("Translation packet:", stdout.getvalue())
 
+    def test_document_packet_reads_text_without_local_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "paper.md"
+            document.write_text(
+                "# Kimi PDF workflow\n\nExtract claims from PDF files.\n\nShip local tasks.",
+                encoding="utf-8",
+            )
+
+            packet = MODULE._document_packet(document)
+
+            serialized = json.dumps(packet, ensure_ascii=False)
+            self.assertEqual(packet["source_name"], "paper.md")
+            self.assertNotIn(directory, serialized)
+            self.assertEqual(packet["segments"][0]["loc"], "section-1")
+            self.assertIn("Cite page/section locations", packet["action_prompt"])
+            self.assertIn("verify-first", packet["claim_prompt"])
+
+    def test_document_packet_pdf_requires_extractor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            document = Path(directory) / "paper.pdf"
+            document.write_bytes(b"%PDF-1.4")
+            with (
+                mock.patch.object(MODULE.shutil, "which", return_value=None),
+                self.assertRaisesRegex(RuntimeError, "pdftotext is required"),
+            ):
+                MODULE._document_packet(document)
+
+    def test_document_packet_cli_writes_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / "brief.txt"
+            document.write_text("Build a claim gate.\n\nAdd an action queue.", encoding="utf-8")
+            output = root / "out"
+            stdout = io.StringIO()
+            with mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "transcriber",
+                    "document-packet",
+                    str(document),
+                    "--output-root",
+                    str(output),
+                ],
+            ), mock.patch("sys.stdout", stdout):
+                self.assertEqual(MODULE.main(), 0)
+            packet_dir = output / "brief"
+            self.assertTrue((packet_dir / "packet.json").exists())
+            self.assertTrue((packet_dir / "extracted.txt").exists())
+            self.assertTrue((packet_dir / "action-prompt.txt").exists())
+            self.assertTrue((packet_dir / "claim-prompt.txt").exists())
+            self.assertTrue((packet_dir / "task-prompt.txt").exists())
+            packet = json.loads((packet_dir / "packet.json").read_text(encoding="utf-8"))
+            self.assertEqual(packet["source_name"], "brief.txt")
+            self.assertIn("Document packet:", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

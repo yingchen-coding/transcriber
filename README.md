@@ -29,6 +29,7 @@ everyone being recorded.
 - Preserves live and final TXT/JSONL artifacts plus per-chunk latency metrics.
 - Generates an evidence-constrained analysis prompt without sending data anywhere by default.
 - Builds timestamp-preserving translation packets for TXT, JSONL, SRT, and VTT transcripts.
+- Builds local document packets from PDF, TXT, or Markdown files for actions, claims, and tasks.
 
 ## Install
 
@@ -64,6 +65,7 @@ transcriber stop
 transcriber refine ~/Documents/transcripts/SESSION
 transcriber analyze ~/Documents/transcripts/SESSION
 transcriber translation-packet SESSION/transcript.txt --target-language zh-CN
+transcriber document-packet paper.pdf
 ```
 
 Run `transcriber doctor` before an important session. It checks Python version, macOS, MLX Whisper
@@ -86,6 +88,7 @@ Sessions are stored under `~/Documents/transcripts/`.
 - `analysis.md`: optional generated analysis
 - `translation-packets/`: optional timestamp-preserving translation prompts, segments, glossary,
   and bilingual fill-in templates
+- `document-packets/`: optional extracted document text plus action, claim, and task prompts
 
 ## Translation Packets
 
@@ -105,6 +108,32 @@ The command does not call a translation service. It creates a local packet with:
 - `bilingual-template.md`: a fill-in review template
 
 The packet stores the transcript file name, not your absolute local path.
+
+## Document Packets
+
+Use `document-packet` when a PDF or saved article should become implementation work instead of
+another unread file:
+
+```bash
+transcriber document-packet report.pdf
+transcriber document-packet notes.md --output-root ./document-work
+```
+
+For PDFs, install `pdftotext` first:
+
+```bash
+brew install poppler
+```
+
+The command runs locally and creates:
+
+- `packet.json`: source file name, extracted segments, glossary, and prompts
+- `extracted.txt`: page or section chunks with stable locations
+- `action-prompt.txt`: prompt for implementation-ready action items
+- `claim-prompt.txt`: prompt for evidence-gated claims
+- `task-prompt.txt`: prompt for a local workboard queue
+
+The packet stores the document file name, not your absolute local path.
 
 ## Boundaries
 

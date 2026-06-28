@@ -541,6 +541,129 @@ def _render_bilingual_template(packet: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _extract_document_text(path: Path) -> str:
+    suffix = path.suffix.lower()
+    if suffix in {".txt", ".md"}:
+        return path.read_text(encoding="utf-8", errors="replace")
+    if suffix != ".pdf":
+        raise RuntimeError("document-packet input must be PDF, TXT, or Markdown")
+    executable = shutil.which("pdftotext")
+    if not executable:
+        raise RuntimeError("pdftotext is required for PDF document-packet extraction")
+    completed = subprocess.run(
+        [executable, "-layout", str(path), "-"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    return completed.stdout
+
+
+def _document_segments(path: Path, text: str, max_chars: int = 1800) -> list[dict[str, str]]:
+    if path.suffix.lower() == ".pdf":
+        pages = [page.strip() for page in text.split("\f")]
+        return [
+            {"loc": f"page-{index}", "text": page}
+            for index, page in enumerate(pages, start=1)
+            if page
+        ]
+
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
+    segments: list[dict[str, str]] = []
+    for paragraph in paragraphs:
+        if len(paragraph) <= max_chars:
+            segments.append({"loc": f"section-{len(segments) + 1}", "text": paragraph})
+            continue
+        for start in range(0, len(paragraph), max_chars):
+            chunk = paragraph[start : start + max_chars].strip()
+            if chunk:
+                segments.append({"loc": f"section-{len(segments) + 1}", "text": chunk})
+    return segments
+
+
+def _document_glossary(segments: list[dict[str, str]], limit: int = 50) -> list[str]:
+    text = "\n".join(segment["text"] for segment in segments)
+    candidates = re.findall(r"\b[A-Z][A-Za-z0-9+.#/-]{1,}\b|\b[A-Za-z]+(?:-[A-Za-z]+)+\b", text)
+    ignored = {"I", "The", "And", "This", "That"}
+    terms: list[str] = []
+    for candidate in candidates:
+        if candidate in ignored or candidate in terms:
+            continue
+        terms.append(candidate)
+        if len(terms) >= limit:
+            break
+    return terms
+
+
+def _document_prompt(packet: dict[str, Any], mode: str) -> str:
+    source = packet["source_name"]
+    locations = ", ".join(segment["loc"] for segment in packet["segments"][:12])
+    if len(packet["segments"]) > 12:
+        locations += ", ..."
+    common = (
+        f"Source document: {source}\n"
+        f"Available locations: {locations or '(none)'}\n\n"
+        "Rules:\n"
+        "- Cite page/section locations for every important point.\n"
+        "- Do not invent facts that are not in the provided segments.\n"
+        "- Separate direct evidence from inference.\n"
+        "- Keep private/local paths out of the output.\n\n"
+    )
+    if mode == "actions":
+        return common + (
+            "Turn this document into implementation-ready action items. For each item include: "
+            "title, why it matters, source location, acceptance criteria, and first local test.\n"
+        )
+    if mode == "claims":
+        return common + (
+            "Extract claims that should be verified before use. For each claim include: subject, "
+            "claim type, exact evidence location, missing evidence, and recommendation "
+            "reject/verify-first/track/validated.\n"
+        )
+    if mode == "tasks":
+        return common + (
+            "Turn this document into a local workboard queue. For each task include: title, "
+            "source location, expected artifact, dependency, and done condition.\n"
+        )
+    raise RuntimeError(f"Unknown document prompt mode: {mode}")
+
+
+def _document_packet(document: Path) -> dict[str, Any]:
+    text = _extract_document_text(document)
+    segments = _document_segments(document, text)
+    if not segments:
+        raise RuntimeError(f"No extractable text found in {document}")
+    packet = {
+        "version": 1,
+        "source_name": document.name,
+        "created_at": datetime.now().isoformat(),
+        "characters": len(text),
+        "segments": segments,
+        "glossary": _document_glossary(segments),
+    }
+    packet["action_prompt"] = _document_prompt(packet, "actions")
+    packet["claim_prompt"] = _document_prompt(packet, "claims")
+    packet["task_prompt"] = _document_prompt(packet, "tasks")
+    return packet
+
+
+def _write_document_packet(document: Path, output_root: Path | None) -> Path:
+    packet = _document_packet(document)
+    root = output_root or document.parent / "document-packets"
+    out = root / _slug(document.stem)
+    out.mkdir(parents=True, exist_ok=True)
+    _atomic_json(out / "packet.json", packet)
+    (out / "extracted.txt").write_text(
+        "\n\n".join(f"[{item['loc']}]\n{item['text']}" for item in packet["segments"]) + "\n",
+        encoding="utf-8",
+    )
+    (out / "action-prompt.txt").write_text(packet["action_prompt"], encoding="utf-8")
+    (out / "claim-prompt.txt").write_text(packet["claim_prompt"], encoding="utf-8")
+    (out / "task-prompt.txt").write_text(packet["task_prompt"], encoding="utf-8")
+    return out
+
+
 def _refine_transcript(session_dir: Path, language: str | None) -> None:
     """Create a higher-context final transcript while preserving the live transcript."""
     text_path = session_dir / "transcript.txt"
@@ -1105,6 +1228,13 @@ def _parser() -> argparse.ArgumentParser:
     packet.add_argument("--source-language", default="auto")
     packet.add_argument("--target-language", default="zh-CN")
 
+    document = subparsers.add_parser(
+        "document-packet",
+        help="Build local action, claim, and task prompts from a PDF/TXT/Markdown document",
+    )
+    document.add_argument("document", type=Path)
+    document.add_argument("--output-root", type=Path)
+
     monitor = subparsers.add_parser("_monitor", help=argparse.SUPPRESS)
     monitor.add_argument("--session-dir", required=True, type=Path)
     return parser
@@ -1147,6 +1277,13 @@ def main() -> int:
             args.target_language,
         )
         print(f"Translation packet: {output}")
+        return 0
+    if args.command == "document-packet":
+        output = _write_document_packet(
+            args.document.resolve(),
+            args.output_root.resolve() if args.output_root else None,
+        )
+        print(f"Document packet: {output}")
         return 0
     raise RuntimeError(f"Unknown command: {args.command}")
 
