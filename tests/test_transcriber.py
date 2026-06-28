@@ -215,6 +215,85 @@ class TranscriberTest(unittest.TestCase):
             self.assertIn("Final transcript lines: 1", text)
             self.assertIn("Metric records: 2", text)
 
+    def test_translation_packet_reads_timestamped_text_without_local_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transcript = Path(directory) / "meeting.txt"
+            transcript.write_text(
+                "[00:00:00-00:00:05] Discuss MLX Whisper latency.\n"
+                "[00:00:05-00:00:08] 保留 API 名称。\n",
+                encoding="utf-8",
+            )
+            packet = MODULE._translation_packet(
+                transcript,
+                source_language="auto",
+                target_language="zh-CN",
+            )
+            self.assertEqual(packet["source_name"], "meeting.txt")
+            self.assertNotIn(directory, json.dumps(packet, ensure_ascii=False))
+            self.assertEqual(packet["segments"][0]["time"], "00:00:00-00:00:05")
+            self.assertIn("MLX", packet["glossary"])
+            self.assertIn("Preserve every timestamp", packet["translation_prompt"])
+
+    def test_translation_packet_reads_jsonl_segments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transcript = Path(directory) / "transcript.jsonl"
+            transcript.write_text(
+                json.dumps({"start_seconds": 1.2, "end_seconds": 3.8, "text": "Hello API"})
+                + "\n",
+                encoding="utf-8",
+            )
+            segments = MODULE._read_translation_segments(transcript)
+            self.assertEqual(segments, [{"time": "00:00:01-00:00:03", "text": "Hello API"}])
+
+    def test_translation_packet_reads_srt_and_vtt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            srt = Path(directory) / "sample.srt"
+            srt.write_text(
+                "1\n00:00:01,000 --> 00:00:03,000\nHello API.\n\n"
+                "2\n00:00:04,000 --> 00:00:05,000\nKeep timestamps.\n",
+                encoding="utf-8",
+            )
+            vtt = Path(directory) / "sample.vtt"
+            vtt.write_text(
+                "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nHello API.\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                MODULE._read_translation_segments(srt)[0]["time"],
+                "00:00:01.000-00:00:03.000",
+            )
+            self.assertEqual(MODULE._read_translation_segments(vtt)[0]["text"], "Hello API.")
+
+    def test_translation_packet_cli_writes_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            transcript = root / "meeting.txt"
+            transcript.write_text("[00:00:00] Ship the transcriber CLI.\n", encoding="utf-8")
+            output = root / "out"
+            stdout = io.StringIO()
+            with mock.patch.object(
+                sys,
+                "argv",
+                [
+                    "transcriber",
+                    "translation-packet",
+                    str(transcript),
+                    "--output-root",
+                    str(output),
+                    "--target-language",
+                    "es",
+                ],
+            ), mock.patch("sys.stdout", stdout):
+                self.assertEqual(MODULE.main(), 0)
+            packet_dir = output / "meeting"
+            self.assertTrue((packet_dir / "packet.json").exists())
+            self.assertTrue((packet_dir / "prompt.txt").exists())
+            self.assertTrue((packet_dir / "segments.txt").exists())
+            self.assertTrue((packet_dir / "bilingual-template.md").exists())
+            packet = json.loads((packet_dir / "packet.json").read_text(encoding="utf-8"))
+            self.assertEqual(packet["target_language"], "es")
+            self.assertIn("Translation packet:", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

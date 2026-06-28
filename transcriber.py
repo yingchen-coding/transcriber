@@ -58,6 +58,11 @@ DEFAULT_CHUNK_SECONDS = 15.0
 DEFAULT_OVERLAP_SECONDS = 2.0
 FINAL_CHUNK_SECONDS = 30.0
 FINAL_OVERLAP_SECONDS = 2.0
+BRACKETED_TRANSCRIPT_LINE = re.compile(r"^\[(?P<time>[^\]]+)\]\s*(?P<text>.*)$")
+SRT_TIMESTAMP_LINE = re.compile(
+    r"^(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s+-->\s+"
+    r"(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})(?:\s+.*)?$"
+)
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
@@ -359,6 +364,181 @@ def _write_analysis_packet(session_dir: Path) -> Path:
         _analysis_prompt(transcript_path.read_text(encoding="utf-8"), metadata), encoding="utf-8"
     )
     return prompt_path
+
+
+def _read_translation_segments(path: Path) -> list[dict[str, str]]:
+    suffix = path.suffix.lower()
+    if suffix == ".jsonl":
+        return _read_jsonl_translation_segments(path)
+    if suffix in {".srt", ".vtt"}:
+        return _read_subtitle_translation_segments(path)
+    return _read_text_translation_segments(path)
+
+
+def _read_jsonl_translation_segments(path: Path) -> list[dict[str, str]]:
+    segments: list[dict[str, str]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            message = f"Invalid transcript JSONL at {path}:{line_number}: {error}"
+            raise RuntimeError(message) from error
+        if not isinstance(record, dict):
+            raise RuntimeError(f"Expected transcript object at {path}:{line_number}")
+        text = str(record.get("text", "")).strip()
+        if not text:
+            continue
+        start = record.get("start_seconds", "")
+        end = record.get("end_seconds", "")
+        if isinstance(start, int | float) and isinstance(end, int | float):
+            timestamp = f"{_clock(float(start))}-{_clock(float(end))}"
+        else:
+            timestamp = f"segment-{len(segments) + 1}"
+        segments.append({"time": timestamp, "text": text})
+    return segments
+
+
+def _read_text_translation_segments(path: Path) -> list[dict[str, str]]:
+    segments: list[dict[str, str]] = []
+    for index, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = line.strip()
+        if not line:
+            continue
+        match = BRACKETED_TRANSCRIPT_LINE.match(line)
+        if match:
+            timestamp = match.group("time").strip()
+            text = match.group("text").strip()
+        else:
+            timestamp = f"line-{index}"
+            text = line
+        if text:
+            segments.append({"time": timestamp, "text": text})
+    return segments
+
+
+def _read_subtitle_translation_segments(path: Path) -> list[dict[str, str]]:
+    text = path.read_text(encoding="utf-8-sig")
+    blocks = re.split(r"\n\s*\n", text.replace("\r\n", "\n").replace("\r", "\n"))
+    segments: list[dict[str, str]] = []
+    for block in blocks:
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        if not lines or lines == ["WEBVTT"]:
+            continue
+        timestamp_index = next(
+            (index for index, line in enumerate(lines) if SRT_TIMESTAMP_LINE.match(line)),
+            -1,
+        )
+        if timestamp_index < 0:
+            continue
+        match = SRT_TIMESTAMP_LINE.match(lines[timestamp_index])
+        if not match:
+            continue
+        payload = " ".join(lines[timestamp_index + 1 :]).strip()
+        if payload:
+            start = match.group("start").replace(",", ".")
+            end = match.group("end").replace(",", ".")
+            segments.append({"time": f"{start}-{end}", "text": payload})
+    return segments
+
+
+def _translation_glossary(segments: list[dict[str, str]], limit: int = 40) -> list[str]:
+    text = "\n".join(segment["text"] for segment in segments)
+    candidates = re.findall(r"\b[A-Z][A-Za-z0-9+.#/-]{1,}\b|\b[A-Za-z]+(?:-[A-Za-z]+)+\b", text)
+    ignored = {"I", "The", "And", "A"}
+    terms: list[str] = []
+    for candidate in candidates:
+        if candidate in ignored or candidate in terms:
+            continue
+        terms.append(candidate)
+        if len(terms) >= limit:
+            break
+    return terms
+
+
+def _translation_prompt(source_language: str, target_language: str, terms: list[str]) -> str:
+    term_text = ", ".join(terms) if terms else "(none detected)"
+    return (
+        f"Translate the transcript from {source_language} to {target_language}.\n"
+        "Rules:\n"
+        "- Preserve every timestamp exactly.\n"
+        "- Preserve speaker labels if present.\n"
+        "- Keep technical terms consistent; do not over-translate product names.\n"
+        "- If the source mixes Chinese and English, translate meaning rather than word order.\n"
+        "- Mark unclear audio as [unclear] instead of inventing content.\n"
+        f"Detected terms to preserve or translate consistently: {term_text}\n"
+    )
+
+
+def _translation_packet(
+    transcript: Path,
+    *,
+    source_language: str,
+    target_language: str,
+) -> dict[str, Any]:
+    segments = _read_translation_segments(transcript)
+    if not segments:
+        raise RuntimeError(f"No transcript segments found in {transcript}")
+    terms = _translation_glossary(segments)
+    return {
+        "version": 1,
+        "source_name": transcript.name,
+        "created_at": datetime.now().isoformat(),
+        "source_language": source_language,
+        "target_language": target_language,
+        "segments": segments,
+        "glossary": terms,
+        "translation_prompt": _translation_prompt(source_language, target_language, terms),
+    }
+
+
+def _write_translation_packet(
+    transcript: Path,
+    output_root: Path | None,
+    source_language: str,
+    target_language: str,
+) -> Path:
+    packet = _translation_packet(
+        transcript,
+        source_language=source_language,
+        target_language=target_language,
+    )
+    root = output_root or transcript.parent / "translation-packets"
+    out = root / _slug(transcript.stem)
+    out.mkdir(parents=True, exist_ok=True)
+    _atomic_json(out / "packet.json", packet)
+    (out / "prompt.txt").write_text(packet["translation_prompt"], encoding="utf-8")
+    (out / "segments.txt").write_text(
+        "\n".join(f"[{item['time']}] {item['text']}" for item in packet["segments"]) + "\n",
+        encoding="utf-8",
+    )
+    (out / "bilingual-template.md").write_text(_render_bilingual_template(packet), encoding="utf-8")
+    return out
+
+
+def _render_bilingual_template(packet: dict[str, Any]) -> str:
+    lines = [
+        "# Translation Packet",
+        "",
+        f"Source: {packet['source_name']}",
+        f"Target language: {packet['target_language']}",
+        "",
+        "## Glossary",
+        "",
+    ]
+    terms = packet.get("glossary") or []
+    if terms:
+        lines.extend(f"- {term}: " for term in terms)
+    else:
+        lines.append("- (none detected)")
+    lines.extend(["", "## Segments", ""])
+    for segment in packet["segments"]:
+        lines.append(f"### [{segment['time']}]")
+        lines.append(f"Source: {segment['text']}")
+        lines.append("Translation: ")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _refine_transcript(session_dir: Path, language: str | None) -> None:
@@ -916,6 +1096,15 @@ def _parser() -> argparse.ArgumentParser:
     refine.add_argument("session_dir", type=Path)
     refine.add_argument("--language", choices=("en", "zh"), default=None)
 
+    packet = subparsers.add_parser(
+        "translation-packet",
+        help="Build a timestamp-preserving translation packet from a transcript",
+    )
+    packet.add_argument("transcript", type=Path)
+    packet.add_argument("--output-root", type=Path)
+    packet.add_argument("--source-language", default="auto")
+    packet.add_argument("--target-language", default="zh-CN")
+
     monitor = subparsers.add_parser("_monitor", help=argparse.SUPPRESS)
     monitor.add_argument("--session-dir", required=True, type=Path)
     return parser
@@ -949,6 +1138,15 @@ def main() -> int:
         _refine_transcript(session_dir, args.language)
         _write_analysis_packet(session_dir)
         print(f"Final transcript: {session_dir / 'transcript.txt'}")
+        return 0
+    if args.command == "translation-packet":
+        output = _write_translation_packet(
+            args.transcript.resolve(),
+            args.output_root.resolve() if args.output_root else None,
+            args.source_language,
+            args.target_language,
+        )
+        print(f"Translation packet: {output}")
         return 0
     raise RuntimeError(f"Unknown command: {args.command}")
 

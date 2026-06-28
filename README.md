@@ -28,6 +28,7 @@ everyone being recorded.
 - Re-transcribes 30-second windows after stop for a cleaner final transcript.
 - Preserves live and final TXT/JSONL artifacts plus per-chunk latency metrics.
 - Generates an evidence-constrained analysis prompt without sending data anywhere by default.
+- Builds timestamp-preserving translation packets for TXT, JSONL, SRT, and VTT transcripts.
 
 ## Install
 
@@ -62,6 +63,7 @@ transcriber status
 transcriber stop
 transcriber refine ~/Documents/transcripts/SESSION
 transcriber analyze ~/Documents/transcripts/SESSION
+transcriber translation-packet SESSION/transcript.txt --target-language zh-CN
 ```
 
 Run `transcriber doctor` before an important session. It checks Python version, macOS, MLX Whisper
@@ -82,6 +84,27 @@ Sessions are stored under `~/Documents/transcripts/`.
 - `metadata.json`: models, duration, language mode, and dropped-block count
 - `analysis-prompt.txt`: timestamp-grounded analysis input
 - `analysis.md`: optional generated analysis
+- `translation-packets/`: optional timestamp-preserving translation prompts, segments, glossary,
+  and bilingual fill-in templates
+
+## Translation Packets
+
+Use `translation-packet` when you need to translate a transcript without losing timestamps:
+
+```bash
+transcriber translation-packet transcript.jsonl --target-language zh-CN
+transcriber translation-packet subtitles.srt --target-language en
+transcriber translation-packet captions.vtt --output-root ./translation-work
+```
+
+The command does not call a translation service. It creates a local packet with:
+
+- `packet.json`: source name, target language, segments, glossary, and prompt
+- `prompt.txt`: instructions for a translation model or human translator
+- `segments.txt`: timestamped source segments
+- `bilingual-template.md`: a fill-in review template
+
+The packet stores the transcript file name, not your absolute local path.
 
 ## Boundaries
 
