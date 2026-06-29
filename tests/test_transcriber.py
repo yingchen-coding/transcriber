@@ -51,6 +51,28 @@ class TranscriberTest(unittest.TestCase):
         self.assertFalse(MODULE._contains_speech(silence))
         self.assertTrue(MODULE._contains_speech(speech_like))
 
+    def test_transcribe_audio_skips_silence_without_calling_model(self):
+        with mock.patch.object(MODULE.mlx_whisper, "transcribe") as transcribe:
+            result = MODULE.transcribe_audio(np.zeros(MODULE.SAMPLE_RATE, dtype=np.float32))
+        self.assertEqual(result, "")
+        transcribe.assert_not_called()
+
+    def test_transcribe_audio_applies_engine_cleanup_to_model_output(self):
+        speech_like = np.zeros(MODULE.SAMPLE_RATE * 8, dtype=np.float32)
+        speech_like[10_000:14_000] = 0.05
+        fake = {
+            "text": "Kindle Kindle Kindle Kindle",
+            "segments": [{
+                "text": "Kindle Kindle Kindle Kindle",
+                "compression_ratio": 1.0, "avg_logprob": -0.1, "temperature": 0.0,
+            }],
+        }
+        with mock.patch.object(MODULE.mlx_whisper, "transcribe", return_value=fake) as transcribe:
+            result = MODULE.transcribe_audio(speech_like, language="zh")
+        transcribe.assert_called_once()
+        # the engine's hallucination cleanup collapses the repetition to empty
+        self.assertEqual(result, "")
+
     def test_high_compression_decode_is_rejected(self):
         result = {
             "text": "Bring the language. " * 8,

@@ -175,6 +175,29 @@ def _result_text(result: dict[str, Any]) -> str:
     return text
 
 
+def transcribe_audio(audio: np.ndarray, language: str | None = None) -> str:
+    """Transcribe one in-memory audio buffer (float32, 16 kHz mono) to clean text.
+
+    The one-shot counterpart to the streaming TranscriptionWorker: it applies the same speech
+    gate, tuned decode settings, hallucination rejection, and cleanup, so callers (e.g. the F13
+    voice hotkey) get the transcriber's quality without reimplementing it. Returns "" for silence
+    or audio that decodes to a hallucination.
+    """
+    if not _contains_speech(audio):
+        return ""
+    kwargs: dict[str, Any] = {
+        "path_or_hf_repo": FINAL_MODEL,
+        "condition_on_previous_text": False,
+        "no_speech_threshold": 0.8,
+        "compression_ratio_threshold": 1.8,
+        "temperature": 0.0,
+    }
+    if language:
+        kwargs["language"] = language
+    result = mlx_whisper.transcribe(audio, **kwargs)
+    return _clean_transcript(_result_text(result))
+
+
 def _remove_overlap(previous: str, current: str, minimum: int = 6) -> str:
     """Remove a repeated character suffix caused by overlapped audio chunks."""
     left = re.sub(r"\s+", "", previous)
