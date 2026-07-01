@@ -149,15 +149,6 @@ The command runs locally and creates:
 
 The packet stores the document file name, not your absolute local path.
 
-## Local Review Gate
-
-```bash
-scripts/pr_review_check.sh
-```
-
-This runs Ruff, unit tests, compile checks, package install checks, CLI smoke tests, and a
-public-surface scan. GitHub also runs it through the `PR Review Gate` workflow on macOS.
-
 ## Boundaries
 
 - Select the primary language explicitly. Use `zh` for Chinese with embedded English terms and `en`
