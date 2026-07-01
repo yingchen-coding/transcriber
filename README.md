@@ -145,11 +145,6 @@ The packet stores the document file name, not your absolute local path.
   distance, room echo, and overlapping speakers.
 - The live transcript prioritizes visibility; use the final transcript for review.
 
-## Local Review
-
-```bash
-scripts/pr_review_check.sh
-```
 
 This runs Ruff, unit tests, compile checks, package install, CLI smoke, and a public-surface scan.
 
