@@ -10,3 +10,4 @@ transcripts/
 *.wav
 *.mov
 *.mp4
+scripts/pr_review_check.sh
