@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="254" viewBox="0 0 780 254" role="img" aria-label="transcriber — live interview transcription, on-device">
+  <rect width="780" height="254" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <rect width="780" height="40" rx="10" fill="#161b22"/>
+  <rect y="30" width="780" height="10" fill="#161b22"/>
+  <circle cx="18" cy="20" r="6" fill="#ff5f56"/><circle cx="38" cy="20" r="6" fill="#ffbd2e"/><circle cx="58" cy="20" r="6" fill="#27c93f"/>
+  <text x="390" y="24" fill="#8b949e" font-family="monospace" font-size="12" text-anchor="middle">transcriber — live interview transcription, on-device</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13.5">
+    <text x="22" y="58" fill="#e6edf3" xml:space="preserve">$ transcriber --language zh</text><text x="22" y="80" fill="#8b949e" xml:space="preserve">  ● recording…   large-v3, on-device, no cloud</text><text x="22" y="124" fill="#3fb950" xml:space="preserve">  [00:03]  请介绍一下你最近的一个项目</text><text x="22" y="146" fill="#3fb950" xml:space="preserve">  [00:07]  I led the migration to a streaming eval pipeline…</text><text x="22" y="190" fill="#e6edf3" xml:space="preserve">  ^C</text><text x="22" y="212" fill="#3fb950" xml:space="preserve">  ✓ saved:  transcript.md · segments.json · audio.wav</text>
+  </g>
+</svg>

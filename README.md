@@ -4,6 +4,8 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+![transcriber — live interview transcription, on-device](assets/demo.svg)
+
 Record the room. Keep the raw audio. Get live notes now and a cleaner transcript after.
 
 Transcriber is a local-first macOS recorder for meetings, interviews, lectures, calls on speaker,
