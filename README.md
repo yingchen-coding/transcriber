@@ -77,6 +77,20 @@ Claude CLI; use it only when that data-handling path is acceptable.
 
 Sessions are stored under `~/Documents/transcripts/`.
 
+## Quick Start
+
+```bash
+transcriber doctor
+transcriber start --name interview-practice --language zh
+# speak for a short test
+transcriber stop
+transcriber analyze ~/Documents/transcripts/interview-practice*
+```
+
+For best accuracy, use an external microphone, keep speakers audible, and choose the dominant
+language explicitly. Use `zh` for Chinese with embedded English terms; use `en` for English-heavy
+sessions.
+
 ## Artifacts
 
 - `audio.wav`: complete source recording
@@ -135,6 +149,15 @@ The command runs locally and creates:
 
 The packet stores the document file name, not your absolute local path.
 
+## Local Review Gate
+
+```bash
+scripts/pr_review_check.sh
+```
+
+This runs Ruff, unit tests, compile checks, package install checks, CLI smoke tests, and a
+public-surface scan. GitHub also runs it through the `PR Review Gate` workflow on macOS.
+
 ## Boundaries
 
 - Select the primary language explicitly. Use `zh` for Chinese with embedded English terms and `en`
@@ -144,9 +167,6 @@ The packet stores the document file name, not your absolute local path.
 - Mac mini has no built-in microphone. Accuracy depends heavily on the connected input device,
   distance, room echo, and overlapping speakers.
 - The live transcript prioritizes visibility; use the final transcript for review.
-
-
-This runs Ruff, unit tests, compile checks, package install, CLI smoke, and a public-surface scan.
 
 ## Test
 
